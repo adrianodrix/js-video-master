@@ -1,11 +1,12 @@
+/* eslint-disable global-require */
 const robots = {
   userInput: require('./robots/user-input'),
-  text: require('./robots/text')
+  text: require('./robots/text'),
 }
 
-async function start () {
+async function start() {
   const content = {
-    maximumSentences: 7
+    maximumSentences: 7,
   }
 
   robots.userInput(content)
