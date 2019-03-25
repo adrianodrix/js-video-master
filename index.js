@@ -1,4 +1,3 @@
-/* eslint-disable global-require */
 const robots = {
   input: require('./robots/input'),
   text: require('./robots/text'),
