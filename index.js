@@ -1,18 +1,16 @@
 /* eslint-disable global-require */
 const robots = {
-  userInput: require('./robots/user-input'),
+  input: require('./robots/input'),
   text: require('./robots/text'),
+  state: require('./robots/state'),
 }
 
 async function start() {
-  const content = {
-    maximumSentences: 7,
-  }
+  robots.input()
+  await robots.text()
 
-  robots.userInput(content)
-  await robots.text(content)
-
-  console.log(content)
+  const content = robots.state.load()
+  console.dir(content, { depth: null })
 }
 
 start()

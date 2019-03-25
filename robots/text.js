@@ -1,23 +1,20 @@
+const NaturalLanguageUnderstandingV1 = require('watson-developer-cloud/natural-language-understanding/v1')
+
 const algorithmia = require('algorithmia')
 const sentenceBoundaryDetection = require('sbd')
+
 const algorithmiaApiKey = require('../credentials/algorithmia.json').apiKey
-
 const watsonApiKey = require('../credentials/watson-nlu.json').apikey
-const NaturalLanguageUnderstandingV1 = require('watson-developer-cloud/natural-language-understanding/v1.js')
 
-let nlu = new NaturalLanguageUnderstandingV1({
+const nlu = new NaturalLanguageUnderstandingV1({
   iam_apikey: watsonApiKey,
   version: '2018-04-05',
   url: 'https://gateway.watsonplatform.net/natural-language-understanding/api/',
 })
 
-async function robot(content) {
-  await fetchContentFromWikipedia(content)
-  sanitizeContent(content)
-  breakContentIntoSentences(content)
-  limitMaximumSentences(content)
-  await fetchKeywordsOfAllSentences(content)
+const state = require('./state')
 
+async function robot() {
   async function fetchContentFromWikipedia(content) {
     const algorithmiaAuthenticated = algorithmia(algorithmiaApiKey)
     const wikipediaAlgorithm = algorithmiaAuthenticated.algo('web/WikipediaParser/0.1.2?timeout=300')
@@ -27,12 +24,12 @@ async function robot(content) {
     content.sourceContentOriginal = wikipediaContent.content
   }
 
+  function removeDatesInParentheses(text) {
+    // return text.replace(/\((?:\([^()]*\)|[^()])*\)/gm, '').replace(/  /g,' ')
+    return text.replace(/\((?:\([^()]*\)|[^()])*\)/gm, '')
+  }
+
   function sanitizeContent(content) {
-    const withoutBlankLinesAndMarkdown = removeBlankLinesAndMarkdown(content.sourceContentOriginal)
-    const withoutDatesInParentheses = removeDatesInParentheses(withoutBlankLinesAndMarkdown)
-
-    content.sourceContentSanitized = withoutDatesInParentheses
-
     function removeBlankLinesAndMarkdown(text) {
       const allLines = text.split('\n')
 
@@ -46,11 +43,11 @@ async function robot(content) {
 
       return withoutBlankLinesAndMarkdown.join(' ')
     }
-  }
 
-  function removeDatesInParentheses(text) {
-    // return text.replace(/\((?:\([^()]*\)|[^()])*\)/gm, '').replace(/  /g,' ')
-    return text.replace(/\((?:\([^()]*\)|[^()])*\)/gm, '')
+    const withoutBlankLinesAndMarkdown = removeBlankLinesAndMarkdown(content.sourceContentOriginal)
+    const withoutDatesInParentheses = removeDatesInParentheses(withoutBlankLinesAndMarkdown)
+
+    content.sourceContentSanitized = withoutDatesInParentheses
   }
 
   function breakContentIntoSentences(content) {
@@ -70,14 +67,8 @@ async function robot(content) {
     content.sentences = content.sentences.slice(0, content.maximumSentences)
   }
 
-  async function fetchKeywordsOfAllSentences(content) {
-    for (const sentence of content.sentences) {
-      sentence.keywords = await fetchWatsonAndReturnKeywords(sentence.text)
-    }
-  }
-
   async function fetchWatsonAndReturnKeywords(sentence) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       nlu.analyze({
         text: sentence,
         features: {
@@ -88,12 +79,33 @@ async function robot(content) {
           throw error
         }
 
-        const keywords = response.keywords.map((keyword) => keyword.text)
+        const keywords = response.keywords.map(keyword => keyword.text)
 
         resolve(keywords)
       })
     })
   }
+
+  async function fetchKeywordsOfAllSentences(content) {
+    // https://lavrton.com/javascript-loops-how-to-handle-async-await-6252dd3c795/
+    // https://medium.com/@mathiasghenoazzolini/javascript-loops-com-async-await-8b07caf38017
+    const promises = content.sentences.map(async (sentence) => {
+      sentence.keywords = await fetchWatsonAndReturnKeywords(sentence.text)
+      return sentence
+    })
+
+    await Promise.all(promises)
+  }
+
+  const content = state.load()
+
+  await fetchContentFromWikipedia(content)
+  sanitizeContent(content)
+  breakContentIntoSentences(content)
+  limitMaximumSentences(content)
+  await fetchKeywordsOfAllSentences(content)
+
+  state.save(content)
 }
 
 module.exports = robot
