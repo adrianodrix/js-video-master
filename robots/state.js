@@ -1,5 +1,6 @@
 const fs = require('fs')
 const contentFilePath = './content.json'
+const scriptFilePath = './content/after-effects-script.js'
 
 function save(content) {
   const contentString = JSON.stringify(content)
@@ -12,7 +13,14 @@ function load() {
   return contentJson
 }
 
+function saveScript(content) {
+  const contentString = JSON.stringify(content)
+  const scriptString = `var content = ${contentString}`
+  return fs.writeFileSync(scriptFilePath, scriptString)
+}
+
 module.exports = {
   save,
-  load
+  load,
+  saveScript
 }
